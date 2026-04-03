@@ -106,7 +106,7 @@ export default function CreateTaskScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FF' },
   content: { padding: 16 },
-  backBtn: { marginBottom: 16, marginTop: 44 },
+  backBtn: { marginBottom: 16, marginTop: 16 },
   backText: { color: '#6366F1', fontSize: 16, fontWeight: '500' },
   card: {
     backgroundColor: '#FFFFFF',

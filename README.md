@@ -1,79 +1,72 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Task Manager App
 
-# Getting Started
+A production-grade React Native task management app built with clean architecture.
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+## Features
 
-## Step 1: Start the Metro Server
+- Auth flow with validation and persistent login (AsyncStorage)
+- Task listing with search, filter, pagination, pull-to-refresh
+- Task detail with inline title editing and status toggle
+- Create new tasks with validation
+- Offline support — tasks cached locally, shown on API failure
+- Redux Toolkit for state management
+- Clean folder structure with separation of UI, logic, and API
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+## Tech Stack
 
-To start Metro, run the following command from the _root_ of your React Native project:
+| Layer | Technology |
+|---|---|
+| Framework | React Native CLI 0.74 |
+| Language | TypeScript |
+| State | Redux Toolkit |
+| Navigation | React Navigation v6 |
+| Storage | AsyncStorage |
+| API | JSONPlaceholder |
 
+## Project Structure
+src/
+├── api/          # API service layer
+├── components/   # Reusable UI components
+├── hooks/        # Custom hooks (useAuth, useTasks, useDebounce)
+├── navigation/   # Stack navigators
+├── screens/      # Screen components
+├── store/        # Redux store + slices
+├── theme/        # Colors and typography
+├── types/        # TypeScript interfaces
+└── utils/        # Storage service and validators
+
+## Setup & Run
+
+### Prerequisites
+- Node.js 18+
+- Android Studio + Android SDK
+- Java 17
+
+### Steps
 ```bash
-# using npm
-npm start
+# 1. Clone the repo
+git clone <https://github.com/Sukshith27/Spydra-TaskHub.git>
+cd TaskApp
 
-# OR using Yarn
-yarn start
-```
+# 2. Install dependencies
+npm install
 
-## Step 2: Start your Application
+# 3. Start Metro
+yarn start --reset-cache
 
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
-
-### For Android
-
-```bash
-# using npm
-npm run android
-
-# OR using Yarn
+# 4. Run on Android (new terminal)
 yarn android
 ```
 
-### For iOS
+### Login
+Use any username (3+ characters) and any password (6+ characters).
 
-```bash
-# using npm
-npm run ios
+## API
 
-# OR using Yarn
-yarn ios
-```
+Uses [JSONPlaceholder](https://jsonplaceholder.typicode.com/todos) — a free fake REST API for testing.
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+## Offline Behaviour
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
-
-## Step 3: Modifying your App
-
-Now that you have successfully run the app, let's modify it.
-
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
-
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- Tasks are saved to AsyncStorage after every successful API fetch
+- If the API fails on launch, cached tasks are loaded automatically
+- Login state persists across app restarts
