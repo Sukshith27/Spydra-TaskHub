@@ -24,6 +24,10 @@ import { logout } from '../../store/slices/authSlice';
 import { StorageService } from '../../utils/storage';
 import { Task, TaskFilter, RootStackParamList } from '../../types';
 import { useDebounce } from '../../hooks/useDebounce';
+import TaskCard from '../../components/tasks/TaskCard';
+import EmptyState from '../../components/common/EmptyState';
+import Loader from '../../components/common/Loader';
+import { useTheme } from '../../theme';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -33,38 +37,12 @@ const FILTERS: { label: string; value: TaskFilter }[] = [
   { label: 'Completed', value: 'completed' },
 ];
 
-const TaskItem = React.memo(
-  ({ item, onPress }: { item: Task; onPress: () => void }) => (
-    <TouchableOpacity style={styles.taskCard} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.taskRow}>
-        <View
-          style={[
-            styles.statusDot,
-            { backgroundColor: item.completed ? '#10B981' : '#F59E0B' },
-          ]}
-        />
-        <View style={styles.taskContent}>
-          <Text style={styles.taskTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <View style={styles.taskFooter}>
-            <View style={[styles.badge, { backgroundColor: item.completed ? '#DCFCE7' : '#FEF3C7' }]}>
-              <Text style={[styles.badgeText, { color: item.completed ? '#10B981' : '#F59E0B' }]}>
-                {item.completed ? '✓ Completed' : '● Pending'}
-              </Text>
-            </View>
-            <Text style={styles.taskId}>#{item.id}</Text>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  )
-);
-
 export default function TaskListScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<NavProp>();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+
   const { filteredItems, isLoading, isRefreshing, error, page, hasMore, filter } =
     useSelector((state: RootState) => state.tasks);
   const username = useSelector((state: RootState) => state.auth.username);
@@ -97,9 +75,10 @@ export default function TaskListScreen() {
   };
 
   const renderItem = useCallback(
-    ({ item }: { item: Task }) => (
-      <TaskItem
+    ({ item, index }: { item: Task; index: number }) => (
+      <TaskCard
         item={item}
+        index={index}
         onPress={() => navigation.navigate('TaskDetail', { taskId: item.id })}
       />
     ),
@@ -108,66 +87,73 @@ export default function TaskListScreen() {
 
   const renderFooter = () => {
     if (!isLoading || isRefreshing) return null;
-    return <ActivityIndicator style={styles.loader} color="#6366F1" />;
+    return <Loader />;
   };
 
   const renderEmpty = () => {
     if (isLoading) return null;
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyIcon}>{error ? '⚠️' : '📋'}</Text>
-        <Text style={styles.emptyTitle}>{error ? 'Something went wrong' : 'No tasks found'}</Text>
-        <Text style={styles.emptySubtitle}>
-          {error ? 'Showing cached data if available' : 'Try a different search or filter'}
-        </Text>
-      </View>
+    return error ? (
+      <EmptyState
+        icon="⚠️"
+        title="Something went wrong"
+        subtitle="Showing cached data if available"
+      />
+    ) : (
+      <EmptyState
+        icon="📋"
+        title="No tasks found"
+        subtitle="Try a different search or filter"
+      />
     );
   };
 
   const taskCount = filteredItems.length;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View>
-          <Text style={styles.greeting}>Hello, {username} 👋</Text>
-          <Text style={styles.heading}>My Tasks</Text>
+          <Text style={[styles.greeting, { color: colors.textSecondary }]}>
+            Hello, {username} 👋
+          </Text>
+          <Text style={[styles.heading, { color: colors.textPrimary }]}>My Tasks</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity
-            style={styles.addButton}
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
             onPress={() => navigation.navigate('CreateTask')}
             activeOpacity={0.8}>
             <Text style={styles.addButtonText}>+ New</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-            <Text style={styles.logoutText}>Logout</Text>
+            <Text style={[styles.logoutText, { color: colors.error }]}>Logout</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Stats bar */}
-      <View style={styles.statsBar}>
-        <Text style={styles.statsText}>
+      <View style={[styles.statsBar, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.statsText, { color: colors.textSecondary }]}>
           {taskCount} {taskCount === 1 ? 'task' : 'tasks'} found
         </Text>
-        {error ? <Text style={styles.offlineTag}>📵 Offline</Text> : null}
+        {error ? <Text style={[styles.offlineTag, { color: colors.error }]}>📵 Offline</Text> : null}
       </View>
 
       {/* Search */}
-      <View style={styles.searchWrapper}>
+      <View style={[styles.searchWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.textPrimary }]}
           placeholder="Search tasks..."
           value={searchText}
           onChangeText={setSearchText}
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={colors.textHint}
         />
         {searchText.length > 0 && (
           <TouchableOpacity onPress={() => setSearchText('')}>
-            <Text style={styles.clearBtn}>✕</Text>
+            <Text style={[styles.clearBtn, { color: colors.textHint }]}>✕</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -177,10 +163,19 @@ export default function TaskListScreen() {
         {FILTERS.map(f => (
           <TouchableOpacity
             key={f.value}
-            style={[styles.filterBtn, filter === f.value && styles.filterBtnActive]}
+            style={[
+              styles.filterBtn,
+              { backgroundColor: colors.surfaceSecondary },
+              filter === f.value && { backgroundColor: colors.surface, borderColor: colors.primary },
+            ]}
             onPress={() => dispatch(setFilter(f.value))}
             activeOpacity={0.7}>
-            <Text style={[styles.filterText, filter === f.value && styles.filterTextActive]}>
+            <Text
+              style={[
+                styles.filterText,
+                { color: colors.textSecondary },
+                filter === f.value && { color: colors.primary, fontWeight: '600' },
+              ]}>
               {f.label}
             </Text>
           </TouchableOpacity>
@@ -189,9 +184,11 @@ export default function TaskListScreen() {
 
       {/* List */}
       {isLoading && filteredItems.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loadingText}>Loading tasks...</Text>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading tasks...
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -206,8 +203,8 @@ export default function TaskListScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              colors={['#6366F1']}
-              tintColor="#6366F1"
+              colors={[colors.primary]}
+              tintColor={colors.primary}
             />
           }
           contentContainerStyle={[
@@ -225,58 +222,51 @@ export default function TaskListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FF' },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
-  greeting: { fontSize: 12, color: '#94A3B8', fontWeight: '500' },
-  heading: { fontSize: 22, fontWeight: '700', color: '#0F172A' },
+  greeting: { fontSize: 12, fontWeight: '500' },
+  heading: { fontSize: 22, fontWeight: '700' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   addButton: {
-    backgroundColor: '#6366F1',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
   addButtonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   logoutBtn: { padding: 4 },
-  logoutText: { color: '#EF4444', fontSize: 13, fontWeight: '500' },
+  logoutText: { fontSize: 13, fontWeight: '500' },
   statsBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
   },
-  statsText: { fontSize: 12, color: '#64748B' },
-  offlineTag: { fontSize: 12, color: '#EF4444' },
+  statsText: { fontSize: 12 },
+  offlineTag: { fontSize: 12 },
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     margin: 16,
     marginBottom: 10,
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   searchIcon: { fontSize: 14, marginRight: 8 },
   searchInput: {
     flex: 1,
     paddingVertical: 11,
     fontSize: 15,
-    color: '#0F172A',
   },
-  clearBtn: { color: '#94A3B8', fontSize: 14, padding: 4 },
+  clearBtn: { fontSize: 14, padding: 4 },
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -287,50 +277,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  filterBtnActive: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#6366F1',
-  },
-  filterText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
-  filterTextActive: { color: '#6366F1', fontWeight: '600' },
-  taskCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginVertical: 5,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  taskRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  statusDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
-  taskContent: { flex: 1 },
-  taskTitle: { fontSize: 15, color: '#0F172A', lineHeight: 22, marginBottom: 10 },
-  taskFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
-  badgeText: { fontSize: 11, fontWeight: '600' },
-  taskId: { fontSize: 11, color: '#CBD5E1' },
+  filterText: { fontSize: 13, fontWeight: '500' },
   listContent: { paddingBottom: 24, paddingTop: 4 },
   listEmpty: { flexGrow: 1 },
-  emptyContainer: {
+  centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 60,
-    gap: 8,
+    gap: 12,
   },
-  emptyIcon: { fontSize: 48, marginBottom: 8 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', color: '#0F172A' },
-  emptySubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', paddingHorizontal: 32 },
-  loadingText: { marginTop: 12, color: '#94A3B8', fontSize: 14 },
-  loader: { padding: 16 },
+  loadingText: { fontSize: 14 },
 });
