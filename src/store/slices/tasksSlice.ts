@@ -5,7 +5,7 @@ import { StorageService } from '../../utils/storage';
 
 export const fetchTasks = createAsyncThunk(
   'tasks/fetchTasks',
-  async (page: number, { rejectWithValue }) => {
+  async (page: number, { rejectWithValue, getState }) => {
     try {
       const data = await todoApi.fetchTasks(page);
       return { tasks: data as Task[], page };
@@ -61,6 +61,9 @@ const applyFilters = (
   return applySorting(result, sortBy);
 };
 
+// API returns IDs 1-200. Local tasks get IDs > 200000 to avoid collision.
+const isLocalTask = (task: Task): boolean => task.id > 200000;
+
 const tasksSlice = createSlice({
   name: 'tasks',
   initialState,
@@ -88,6 +91,7 @@ const tasksSlice = createSlice({
       state.filteredItems = applyFilters(
         state.items, state.searchQuery, state.filter, state.sortBy
       );
+      StorageService.saveTasks(state.items);
     },
     updateTask: (state, action: PayloadAction<Task>) => {
       const index = state.items.findIndex(t => t.id === action.payload.id);
@@ -95,6 +99,7 @@ const tasksSlice = createSlice({
       state.filteredItems = applyFilters(
         state.items, state.searchQuery, state.filter, state.sortBy
       );
+      StorageService.saveTasks(state.items);
     },
     deleteTask: (state, action: PayloadAction<number>) => {
       state.items = state.items.filter(t => t.id !== action.payload);
@@ -124,13 +129,25 @@ const tasksSlice = createSlice({
         state.isLoading = false;
         state.isRefreshing = false;
         const { tasks, page } = action.payload;
+
         if (page === 1) {
-          state.items = tasks;
+          // Keep local tasks, replace API tasks
+          const localTasks = state.items.filter(isLocalTask);
+          // Merge: apply any local edits to API tasks
+          const mergedApiTasks = tasks.map(apiTask => {
+            const existing = state.items.find(t => t.id === apiTask.id);
+            // If user edited this task locally, keep their version
+            return existing ? existing : apiTask;
+          });
+          // Local tasks always stay at top
+          state.items = [...localTasks, ...mergedApiTasks];
         } else {
+          // Load more — only add new API tasks, skip duplicates
           const existingIds = new Set(state.items.map(t => t.id));
           const newTasks = tasks.filter(t => !existingIds.has(t.id));
           state.items = [...state.items, ...newTasks];
         }
+
         state.hasMore = tasks.length === 20;
         state.page = page;
         state.filteredItems = applyFilters(

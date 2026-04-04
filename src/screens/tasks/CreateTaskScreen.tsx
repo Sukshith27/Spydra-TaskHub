@@ -32,9 +32,9 @@ export default function CreateTaskScreen() {
     setIsLoading(true);
     try {
       // Generate a local ID (max existing + 1)
-      const maxId = items.reduce((max, t) => Math.max(max, t.id), 0);
-      const newTask = {
-        id: maxId + 1,
+      const localId = Date.now(); // e.g. 1775000000000 — always > 200000
+const newTask = {
+  id: localId,
         userId: 1,
         title: title.trim(),
         completed: false,

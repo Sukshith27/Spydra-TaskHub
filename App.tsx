@@ -7,10 +7,13 @@ import { StorageService } from './src/utils/storage';
 import { loginSuccess } from './src/store/slices/authSlice';
 import { ActivityIndicator, View, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import ErrorBoundary from './src/components/common/ErrorBoundary';
+import { useTheme } from './src/theme';
 
 function AppContent() {
   const dispatch = useDispatch();
   const [isChecking, setIsChecking] = useState(true);
+  const { colors, isDark } = useTheme();
 
   useEffect(() => {
     const restoreAuth = async () => {
@@ -30,15 +33,23 @@ function AppContent() {
 
   if (isChecking) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FF' }}>
-        <ActivityIndicator size="large" color="#6366F1" />
+      <View style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.background,
+      }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.surface}
+      />
       <NavigationContainer>
         <RootNavigator />
       </NavigationContainer>
@@ -48,10 +59,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <Provider store={store}>
-        <AppContent />
-      </Provider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <Provider store={store}>
+          <AppContent />
+        </Provider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

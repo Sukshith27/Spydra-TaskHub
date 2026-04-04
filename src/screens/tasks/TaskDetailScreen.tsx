@@ -12,7 +12,7 @@ import {
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../../store';
-import { updateTask } from '../../store/slices/tasksSlice';
+import { updateTask, deleteTask } from '../../store/slices/tasksSlice';
 import { RootStackParamList } from '../../types';
 import { useTheme } from '../../theme';
 import { Haptics } from '../../utils/haptics';
@@ -69,6 +69,25 @@ export default function TaskDetailScreen() {
     } catch (e) {
       Alert.alert('Error', 'Could not share task.');
     }
+  };
+
+  const handleDelete = () => {
+    Haptics.error();
+    Alert.alert(
+      'Delete Task',
+      'Are you sure you want to delete this task?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            dispatch(deleteTask(task.id));
+            navigation.goBack();
+          },
+        },
+      ]
+    );
   };
 
   const isDarkMode = colors.background === '#0F172A';
@@ -192,17 +211,7 @@ export default function TaskDetailScreen() {
       {/* Delete button */}
       <TouchableOpacity
         style={[styles.deleteBtn, { borderColor: colors.error }]}
-        onPress={() => {
-          Haptics.error();
-          Alert.alert('Delete Task', 'Are you sure?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete',
-              style: 'destructive',
-              onPress: () => navigation.goBack(),
-            },
-          ]);
-        }}>
+        onPress={handleDelete}>
         <Text style={[styles.deleteBtnText, { color: colors.error }]}>🗑 Delete Task</Text>
       </TouchableOpacity>
     </ScrollView>
