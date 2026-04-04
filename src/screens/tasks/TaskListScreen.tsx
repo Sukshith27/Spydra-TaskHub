@@ -19,6 +19,7 @@ import {
   setSearchQuery,
   setFilter,
   setRefreshing,
+  markAllComplete,
 } from '../../store/slices/tasksSlice';
 import { logout } from '../../store/slices/authSlice';
 import { StorageService } from '../../utils/storage';
@@ -26,7 +27,8 @@ import { Task, TaskFilter, RootStackParamList } from '../../types';
 import { useDebounce } from '../../hooks/useDebounce';
 import TaskCard from '../../components/tasks/TaskCard';
 import EmptyState from '../../components/common/EmptyState';
-import Loader from '../../components/common/Loader';
+import SkeletonCard from '../../components/common/SkeletonCard';
+import NetworkBanner from '../../components/common/NetworkBanner';
 import { useTheme } from '../../theme';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -46,6 +48,15 @@ export default function TaskListScreen() {
   const { filteredItems, isLoading, isRefreshing, error, page, hasMore, filter } =
     useSelector((state: RootState) => state.tasks);
   const username = useSelector((state: RootState) => state.auth.username);
+  const allItems = useSelector((state: RootState) => state.tasks.items);
+
+  const filterCounts = {
+    all: allItems.length,
+    pending: allItems.filter(t => !t.completed).length,
+    completed: allItems.filter(t => t.completed).length,
+  };
+
+  const allDone = allItems.length > 0 && allItems.every(t => t.completed);
 
   const [searchText, setSearchText] = useState('');
   const debouncedSearch = useDebounce(searchText, 400);
@@ -87,7 +98,11 @@ export default function TaskListScreen() {
 
   const renderFooter = () => {
     if (!isLoading || isRefreshing) return null;
-    return <Loader />;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
   };
 
   const renderEmpty = () => {
@@ -112,9 +127,12 @@ export default function TaskListScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
 
+      {/* Network Banner */}
+      <NetworkBanner />
+
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={[styles.greeting, { color: colors.textSecondary }]}>
             Hello, {username} 👋
           </Text>
@@ -134,11 +152,13 @@ export default function TaskListScreen() {
       </View>
 
       {/* Stats bar */}
-      <View style={[styles.statsBar, { backgroundColor: colors.surface }]}>
+      <View style={[styles.statsBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.statsText, { color: colors.textSecondary }]}>
           {taskCount} {taskCount === 1 ? 'task' : 'tasks'} found
         </Text>
-        {error ? <Text style={[styles.offlineTag, { color: colors.error }]}>📵 Offline</Text> : null}
+        {error ? (
+          <Text style={[styles.offlineTag, { color: colors.error }]}>📵 Offline</Text>
+        ) : null}
       </View>
 
       {/* Search */}
@@ -158,37 +178,71 @@ export default function TaskListScreen() {
         )}
       </View>
 
-      {/* Filters */}
-      <View style={styles.filterRow}>
-        {FILTERS.map(f => (
-          <TouchableOpacity
-            key={f.value}
-            style={[
-              styles.filterBtn,
-              { backgroundColor: colors.surfaceSecondary },
-              filter === f.value && { backgroundColor: colors.surface, borderColor: colors.primary },
-            ]}
-            onPress={() => dispatch(setFilter(f.value))}
-            activeOpacity={0.7}>
-            <Text
+      {/* Filters + Mark All — separate rows */}
+      <View style={styles.filterSection}>
+        {/* Filter pills row */}
+        <View style={styles.filterRow}>
+          {FILTERS.map(f => (
+            <TouchableOpacity
+              key={f.value}
               style={[
-                styles.filterText,
-                { color: colors.textSecondary },
-                filter === f.value && { color: colors.primary, fontWeight: '600' },
-              ]}>
-              {f.label}
-            </Text>
+                styles.filterBtn,
+                { backgroundColor: colors.surfaceSecondary, borderColor: 'transparent' },
+                filter === f.value && {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.primary,
+                },
+              ]}
+              onPress={() => dispatch(setFilter(f.value))}
+              activeOpacity={0.7}>
+              <Text
+                style={[
+                  styles.filterText,
+                  { color: colors.textSecondary },
+                  filter === f.value && { color: colors.primary, fontWeight: '600' },
+                ]}>
+                {f.label}
+              </Text>
+              {filterCounts[f.value] > 0 && (
+                <View
+                  style={[
+                    styles.countBadge,
+                    {
+                      backgroundColor: filter === f.value ? colors.primary : colors.border,
+                    },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.countBadgeText,
+                      {
+                        color: filter === f.value ? '#fff' : colors.textSecondary,
+                      },
+                    ]}>
+                    {filterCounts[f.value]}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Mark all complete — separate row below filters */}
+        {!allDone && allItems.length > 0 && (
+          <TouchableOpacity
+            style={[styles.markAllBtn, { backgroundColor: colors.success }]}
+            onPress={() => dispatch(markAllComplete())}
+            activeOpacity={0.8}>
+            <Text style={styles.markAllText}>✓ Mark All Done</Text>
           </TouchableOpacity>
-        ))}
+        )}
       </View>
 
-      {/* List */}
+      {/* List — Skeleton while first load */}
       {isLoading && filteredItems.length === 0 ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Loading tasks...
-          </Text>
+        <View>
+          {[1, 2, 3, 4, 5].map(i => (
+            <SkeletonCard key={i} />
+          ))}
         </View>
       ) : (
         <FlatList
@@ -231,7 +285,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  greeting: { fontSize: 12, fontWeight: '500' },
+  headerLeft: { flex: 1 },
+  greeting: { fontSize: 12, fontWeight: '500', marginBottom: 2 },
   heading: { fontSize: 22, fontWeight: '700' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   addButton: {
@@ -247,7 +302,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
   },
   statsText: { fontSize: 12 },
   offlineTag: { fontSize: 12 },
@@ -267,27 +323,45 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   clearBtn: { fontSize: 14, padding: 4 },
+
+  // Filters — vertical layout to avoid overflow
+  filterSection: {
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    gap: 8,
+  },
   filterRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
     gap: 8,
-    marginBottom: 10,
   },
   filterBtn: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
+    gap: 5,
   },
   filterText: { fontSize: 13, fontWeight: '500' },
+  countBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+    minWidth: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeText: { fontSize: 10, fontWeight: '700' },
+  markAllBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  markAllText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
   listContent: { paddingBottom: 24, paddingTop: 4 },
   listEmpty: { flexGrow: 1 },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: { fontSize: 14 },
+  footerLoader: { padding: 16, alignItems: 'center' },
 });

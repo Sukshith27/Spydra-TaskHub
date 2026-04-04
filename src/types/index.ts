@@ -30,3 +30,9 @@ export type RootStackParamList = {
   TaskDetail: { taskId: number };
   CreateTask: undefined;
 };
+
+export interface FilterCount {
+  all: number;
+  pending: number;
+  completed: number;
+}

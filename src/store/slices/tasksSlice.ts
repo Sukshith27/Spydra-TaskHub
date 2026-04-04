@@ -10,7 +10,6 @@ export const fetchTasks = createAsyncThunk(
       const data = await todoApi.fetchTasks(page);
       return { tasks: data as Task[], page };
     } catch (error) {
-      // Try loading from local storage on failure
       const cached = await StorageService.getTasks();
       if (cached && cached.length > 0) {
         return { tasks: cached as Task[], page: 1, fromCache: true };
@@ -55,36 +54,30 @@ const tasksSlice = createSlice({
   reducers: {
     setSearchQuery: (state, action: PayloadAction<string>) => {
       state.searchQuery = action.payload;
-      state.filteredItems = applyFilters(
-        state.items,
-        action.payload,
-        state.filter
-      );
+      state.filteredItems = applyFilters(state.items, action.payload, state.filter);
     },
     setFilter: (state, action: PayloadAction<TaskFilter>) => {
       state.filter = action.payload;
-      state.filteredItems = applyFilters(
-        state.items,
-        state.searchQuery,
-        action.payload
-      );
+      state.filteredItems = applyFilters(state.items, state.searchQuery, action.payload);
     },
     addTask: (state, action: PayloadAction<Task>) => {
       state.items.unshift(action.payload);
-      state.filteredItems = applyFilters(
-        state.items,
-        state.searchQuery,
-        state.filter
-      );
+      state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
     },
     updateTask: (state, action: PayloadAction<Task>) => {
       const index = state.items.findIndex(t => t.id === action.payload.id);
       if (index !== -1) state.items[index] = action.payload;
-      state.filteredItems = applyFilters(
-        state.items,
-        state.searchQuery,
-        state.filter
-      );
+      state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
+    },
+    deleteTask: (state, action: PayloadAction<number>) => {
+      state.items = state.items.filter(t => t.id !== action.payload);
+      state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
+      StorageService.saveTasks(state.items);
+    },
+    markAllComplete: (state) => {
+      state.items = state.items.map(t => ({ ...t, completed: true }));
+      state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
+      StorageService.saveTasks(state.items);
     },
     setRefreshing: (state, action: PayloadAction<boolean>) => {
       state.isRefreshing = action.payload;
@@ -103,19 +96,13 @@ const tasksSlice = createSlice({
         if (page === 1) {
           state.items = tasks;
         } else {
-          // avoid duplicates on pagination
           const existingIds = new Set(state.items.map(t => t.id));
           const newTasks = tasks.filter(t => !existingIds.has(t.id));
           state.items = [...state.items, ...newTasks];
         }
         state.hasMore = tasks.length === 20;
         state.page = page;
-        state.filteredItems = applyFilters(
-          state.items,
-          state.searchQuery,
-          state.filter
-        );
-        // Save to local storage
+        state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
         StorageService.saveTasks(state.items);
       })
       .addCase(fetchTasks.rejected, (state, action) => {
@@ -131,6 +118,9 @@ export const {
   setFilter,
   addTask,
   updateTask,
+  deleteTask,
+  markAllComplete,
   setRefreshing,
 } = tasksSlice.actions;
+
 export default tasksSlice.reducer;
