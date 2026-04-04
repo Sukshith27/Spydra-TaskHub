@@ -7,6 +7,8 @@ export interface Task {
 
 export type TaskFilter = 'all' | 'pending' | 'completed';
 
+export type SortBy = 'default' | 'title' | 'status';
+
 export interface AuthState {
   isAuthenticated: boolean;
   username: string | null;
@@ -20,6 +22,7 @@ export interface TasksState {
   error: string | null;
   searchQuery: string;
   filter: TaskFilter;
+  sortBy: SortBy;
   page: number;
   hasMore: boolean;
 }

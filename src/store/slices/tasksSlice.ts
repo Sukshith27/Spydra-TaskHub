@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { TasksState, Task, TaskFilter } from '../../types';
+import { TasksState, Task, TaskFilter, SortBy } from '../../types';
 import { todoApi } from '../../api/todoApi';
 import { StorageService } from '../../utils/storage';
 
@@ -27,25 +27,38 @@ const initialState: TasksState = {
   error: null,
   searchQuery: '',
   filter: 'all',
+  sortBy: 'default',
   page: 1,
   hasMore: true,
+};
+
+const applySorting = (items: Task[], sortBy: SortBy): Task[] => {
+  const sorted = [...items];
+  switch (sortBy) {
+    case 'title':
+      return sorted.sort((a, b) => a.title.localeCompare(b.title));
+    case 'status':
+      return sorted.sort((a, b) => Number(a.completed) - Number(b.completed));
+    default:
+      return sorted;
+  }
 };
 
 const applyFilters = (
   items: Task[],
   query: string,
-  filter: TaskFilter
+  filter: TaskFilter,
+  sortBy: SortBy
 ): Task[] => {
-  return items.filter(task => {
-    const matchesSearch = task.title
-      .toLowerCase()
-      .includes(query.toLowerCase());
+  let result = items.filter(task => {
+    const matchesSearch = task.title.toLowerCase().includes(query.toLowerCase());
     const matchesFilter =
       filter === 'all' ||
       (filter === 'completed' && task.completed) ||
       (filter === 'pending' && !task.completed);
     return matchesSearch && matchesFilter;
   });
+  return applySorting(result, sortBy);
 };
 
 const tasksSlice = createSlice({
@@ -54,29 +67,47 @@ const tasksSlice = createSlice({
   reducers: {
     setSearchQuery: (state, action: PayloadAction<string>) => {
       state.searchQuery = action.payload;
-      state.filteredItems = applyFilters(state.items, action.payload, state.filter);
+      state.filteredItems = applyFilters(
+        state.items, action.payload, state.filter, state.sortBy
+      );
     },
     setFilter: (state, action: PayloadAction<TaskFilter>) => {
       state.filter = action.payload;
-      state.filteredItems = applyFilters(state.items, state.searchQuery, action.payload);
+      state.filteredItems = applyFilters(
+        state.items, state.searchQuery, action.payload, state.sortBy
+      );
+    },
+    setSortBy: (state, action: PayloadAction<SortBy>) => {
+      state.sortBy = action.payload;
+      state.filteredItems = applyFilters(
+        state.items, state.searchQuery, state.filter, action.payload
+      );
     },
     addTask: (state, action: PayloadAction<Task>) => {
       state.items.unshift(action.payload);
-      state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
+      state.filteredItems = applyFilters(
+        state.items, state.searchQuery, state.filter, state.sortBy
+      );
     },
     updateTask: (state, action: PayloadAction<Task>) => {
       const index = state.items.findIndex(t => t.id === action.payload.id);
       if (index !== -1) state.items[index] = action.payload;
-      state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
+      state.filteredItems = applyFilters(
+        state.items, state.searchQuery, state.filter, state.sortBy
+      );
     },
     deleteTask: (state, action: PayloadAction<number>) => {
       state.items = state.items.filter(t => t.id !== action.payload);
-      state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
+      state.filteredItems = applyFilters(
+        state.items, state.searchQuery, state.filter, state.sortBy
+      );
       StorageService.saveTasks(state.items);
     },
-    markAllComplete: (state) => {
+    markAllComplete: state => {
       state.items = state.items.map(t => ({ ...t, completed: true }));
-      state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
+      state.filteredItems = applyFilters(
+        state.items, state.searchQuery, state.filter, state.sortBy
+      );
       StorageService.saveTasks(state.items);
     },
     setRefreshing: (state, action: PayloadAction<boolean>) => {
@@ -102,7 +133,9 @@ const tasksSlice = createSlice({
         }
         state.hasMore = tasks.length === 20;
         state.page = page;
-        state.filteredItems = applyFilters(state.items, state.searchQuery, state.filter);
+        state.filteredItems = applyFilters(
+          state.items, state.searchQuery, state.filter, state.sortBy
+        );
         StorageService.saveTasks(state.items);
       })
       .addCase(fetchTasks.rejected, (state, action) => {
@@ -116,6 +149,7 @@ const tasksSlice = createSlice({
 export const {
   setSearchQuery,
   setFilter,
+  setSortBy,
   addTask,
   updateTask,
   deleteTask,

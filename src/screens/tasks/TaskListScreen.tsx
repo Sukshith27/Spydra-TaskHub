@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
@@ -20,16 +21,18 @@ import {
   setFilter,
   setRefreshing,
   markAllComplete,
+  setSortBy,
 } from '../../store/slices/tasksSlice';
 import { logout } from '../../store/slices/authSlice';
 import { StorageService } from '../../utils/storage';
-import { Task, TaskFilter, RootStackParamList } from '../../types';
+import { Task, TaskFilter, SortBy, RootStackParamList } from '../../types';
 import { useDebounce } from '../../hooks/useDebounce';
 import TaskCard from '../../components/tasks/TaskCard';
 import EmptyState from '../../components/common/EmptyState';
 import SkeletonCard from '../../components/common/SkeletonCard';
 import NetworkBanner from '../../components/common/NetworkBanner';
 import { useTheme } from '../../theme';
+import { Haptics } from '../../utils/haptics';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -39,13 +42,19 @@ const FILTERS: { label: string; value: TaskFilter }[] = [
   { label: 'Completed', value: 'completed' },
 ];
 
+const SORT_OPTIONS: { label: string; value: SortBy; icon: string }[] = [
+  { label: 'Default', value: 'default', icon: '📋' },
+  { label: 'By Title', value: 'title', icon: '🔤' },
+  { label: 'By Status', value: 'status', icon: '✅' },
+];
+
 export default function TaskListScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<NavProp>();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
-  const { filteredItems, isLoading, isRefreshing, error, page, hasMore, filter } =
+  const { filteredItems, isLoading, isRefreshing, error, page, hasMore, filter, sortBy } =
     useSelector((state: RootState) => state.tasks);
   const username = useSelector((state: RootState) => state.auth.username);
   const allItems = useSelector((state: RootState) => state.tasks.items);
@@ -59,6 +68,7 @@ export default function TaskListScreen() {
   const allDone = allItems.length > 0 && allItems.every(t => t.completed);
 
   const [searchText, setSearchText] = useState('');
+  const [showSortModal, setShowSortModal] = useState(false);
   const debouncedSearch = useDebounce(searchText, 400);
 
   useEffect(() => {
@@ -81,6 +91,7 @@ export default function TaskListScreen() {
   }, [dispatch, isLoading, hasMore, page]);
 
   const handleLogout = async () => {
+    Haptics.light();
     await StorageService.clearAuth();
     dispatch(logout());
   };
@@ -108,26 +119,16 @@ export default function TaskListScreen() {
   const renderEmpty = () => {
     if (isLoading) return null;
     return error ? (
-      <EmptyState
-        icon="⚠️"
-        title="Something went wrong"
-        subtitle="Showing cached data if available"
-      />
+      <EmptyState icon="⚠️" title="Something went wrong" subtitle="Showing cached data if available" />
     ) : (
-      <EmptyState
-        icon="📋"
-        title="No tasks found"
-        subtitle="Try a different search or filter"
-      />
+      <EmptyState icon="📋" title="No tasks found" subtitle="Try a different search or filter" />
     );
   };
 
-  const taskCount = filteredItems.length;
+  const currentSort = SORT_OPTIONS.find(s => s.value === sortBy);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
-
-      {/* Network Banner */}
       <NetworkBanner />
 
       {/* Header */}
@@ -141,7 +142,10 @@ export default function TaskListScreen() {
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.navigate('CreateTask')}
+            onPress={() => {
+              Haptics.light();
+              navigation.navigate('CreateTask');
+            }}
             activeOpacity={0.8}>
             <Text style={styles.addButtonText}>+ New</Text>
           </TouchableOpacity>
@@ -151,14 +155,24 @@ export default function TaskListScreen() {
         </View>
       </View>
 
-      {/* Stats bar */}
+      {/* Stats + Sort bar */}
       <View style={[styles.statsBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.statsText, { color: colors.textSecondary }]}>
-          {taskCount} {taskCount === 1 ? 'task' : 'tasks'} found
+          {filteredItems.length} {filteredItems.length === 1 ? 'task' : 'tasks'} found
         </Text>
-        {error ? (
-          <Text style={[styles.offlineTag, { color: colors.error }]}>📵 Offline</Text>
-        ) : null}
+        <View style={styles.statsRight}>
+          {error ? <Text style={[styles.offlineTag, { color: colors.error }]}>📵 Offline</Text> : null}
+          <TouchableOpacity
+            style={[styles.sortBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+            onPress={() => {
+              Haptics.light();
+              setShowSortModal(true);
+            }}>
+            <Text style={[styles.sortBtnText, { color: colors.textSecondary }]}>
+              {currentSort?.icon} Sort
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search */}
@@ -178,9 +192,8 @@ export default function TaskListScreen() {
         )}
       </View>
 
-      {/* Filters + Mark All — separate rows */}
+      {/* Filters */}
       <View style={styles.filterSection}>
-        {/* Filter pills row */}
         <View style={styles.filterRow}>
           {FILTERS.map(f => (
             <TouchableOpacity
@@ -188,12 +201,12 @@ export default function TaskListScreen() {
               style={[
                 styles.filterBtn,
                 { backgroundColor: colors.surfaceSecondary, borderColor: 'transparent' },
-                filter === f.value && {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.primary,
-                },
+                filter === f.value && { backgroundColor: colors.surface, borderColor: colors.primary },
               ]}
-              onPress={() => dispatch(setFilter(f.value))}
+              onPress={() => {
+                Haptics.light();
+                dispatch(setFilter(f.value));
+              }}
               activeOpacity={0.7}>
               <Text
                 style={[
@@ -204,20 +217,8 @@ export default function TaskListScreen() {
                 {f.label}
               </Text>
               {filterCounts[f.value] > 0 && (
-                <View
-                  style={[
-                    styles.countBadge,
-                    {
-                      backgroundColor: filter === f.value ? colors.primary : colors.border,
-                    },
-                  ]}>
-                  <Text
-                    style={[
-                      styles.countBadgeText,
-                      {
-                        color: filter === f.value ? '#fff' : colors.textSecondary,
-                      },
-                    ]}>
+                <View style={[styles.countBadge, { backgroundColor: filter === f.value ? colors.primary : colors.border }]}>
+                  <Text style={[styles.countBadgeText, { color: filter === f.value ? '#fff' : colors.textSecondary }]}>
                     {filterCounts[f.value]}
                   </Text>
                 </View>
@@ -226,24 +227,22 @@ export default function TaskListScreen() {
           ))}
         </View>
 
-        {/* Mark all complete — separate row below filters */}
         {!allDone && allItems.length > 0 && (
           <TouchableOpacity
             style={[styles.markAllBtn, { backgroundColor: colors.success }]}
-            onPress={() => dispatch(markAllComplete())}
+            onPress={() => {
+              Haptics.success();
+              dispatch(markAllComplete());
+            }}
             activeOpacity={0.8}>
-            <Text style={styles.markAllText}>✓ Mark All Done</Text>
+            <Text style={styles.markAllText}>✓ All Done</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* List — Skeleton while first load */}
+      {/* List */}
       {isLoading && filteredItems.length === 0 ? (
-        <View>
-          {[1, 2, 3, 4, 5].map(i => (
-            <SkeletonCard key={i} />
-          ))}
-        </View>
+        <View>{[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}</View>
       ) : (
         <FlatList
           data={filteredItems}
@@ -261,16 +260,52 @@ export default function TaskListScreen() {
               tintColor={colors.primary}
             />
           }
-          contentContainerStyle={[
-            styles.listContent,
-            filteredItems.length === 0 && styles.listEmpty,
-          ]}
+          contentContainerStyle={[styles.listContent, filteredItems.length === 0 && styles.listEmpty]}
           removeClippedSubviews={true}
           maxToRenderPerBatch={10}
           windowSize={10}
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* Sort Modal */}
+      <Modal
+        visible={showSortModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSortModal(false)}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSortModal(false)}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+            <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Sort Tasks</Text>
+            {SORT_OPTIONS.map(option => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.sortOption,
+                  { borderColor: colors.border },
+                  sortBy === option.value && { backgroundColor: colors.surfaceSecondary },
+                ]}
+                onPress={() => {
+                  Haptics.light();
+                  dispatch(setSortBy(option.value));
+                  setShowSortModal(false);
+                }}>
+                <Text style={styles.sortOptionIcon}>{option.icon}</Text>
+                <Text style={[styles.sortOptionText, { color: colors.textPrimary }]}>
+                  {option.label}
+                </Text>
+                {sortBy === option.value && (
+                  <Text style={[styles.sortOptionCheck, { color: colors.primary }]}>✓</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -289,11 +324,7 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 12, fontWeight: '500', marginBottom: 2 },
   heading: { fontSize: 22, fontWeight: '700' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  addButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
+  addButton: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   addButtonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   logoutBtn: { padding: 4 },
   logoutText: { fontSize: 13, fontWeight: '500' },
@@ -302,11 +333,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
   },
   statsText: { fontSize: 12 },
+  statsRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   offlineTag: { fontSize: 12 },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  sortBtnText: { fontSize: 12, fontWeight: '500' },
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -317,23 +358,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   searchIcon: { fontSize: 14, marginRight: 8 },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 11,
-    fontSize: 15,
-  },
+  searchInput: { flex: 1, paddingVertical: 11, fontSize: 15 },
   clearBtn: { fontSize: 14, padding: 4 },
-
-  // Filters — vertical layout to avoid overflow
-  filterSection: {
-    paddingHorizontal: 16,
-    marginBottom: 10,
-    gap: 8,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  filterSection: { paddingHorizontal: 16, marginBottom: 10, gap: 8 },
+  filterRow: { flexDirection: 'row', gap: 8 },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -360,8 +388,39 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   markAllText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-
   listContent: { paddingBottom: 24, paddingTop: 4 },
   listEmpty: { flexGrow: 1 },
   footerLoader: { padding: 16, alignItems: 'center' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 36,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16 },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+    gap: 12,
+  },
+  sortOptionIcon: { fontSize: 20 },
+  sortOptionText: { flex: 1, fontSize: 15, fontWeight: '500' },
+  sortOptionCheck: { fontSize: 16, fontWeight: '700' },
 });
