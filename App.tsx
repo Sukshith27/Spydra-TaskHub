@@ -5,7 +5,8 @@ import { store } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import { StorageService } from './src/utils/storage';
 import { loginSuccess } from './src/store/slices/authSlice';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 function AppContent() {
   const dispatch = useDispatch();
@@ -29,23 +30,28 @@ function AppContent() {
 
   if (isChecking) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FF' }}>
         <ActivityIndicator size="large" color="#6366F1" />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
-      <RootNavigator />
-    </NavigationContainer>
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <NavigationContainer>
+        <RootNavigator />
+      </NavigationContainer>
+    </>
   );
 }
 
 export default function App() {
   return (
-    <Provider store={store}>
-      <AppContent />
-    </Provider>
+    <SafeAreaProvider>
+      <Provider store={store}>
+        <AppContent />
+      </Provider>
+    </SafeAreaProvider>
   );
 }
